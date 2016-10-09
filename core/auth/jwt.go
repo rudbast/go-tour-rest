@@ -10,7 +10,9 @@ import (
 	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/dgrijalva/jwt-go/request"
 	"github.com/rudbast/go-tour-rest/config"
+	"github.com/rudbast/go-tour-rest/core/redis"
 	"github.com/rudbast/go-tour-rest/models"
 	"github.com/rudbast/go-tour-rest/util"
 )
@@ -19,6 +21,8 @@ type JWTAuth struct {
 	publicKey  *rsa.PublicKey
 	privateKey *rsa.PrivateKey
 }
+
+const EXPIRE_OFFSET = 3600
 
 func (jwtAuth *JWTAuth) Authenticate(user *models.User) (int, bool) {
 	// TODO: hash password.
@@ -87,6 +91,16 @@ func (jwtAuth *JWTAuth) GenerateToken(userId int) (string, error) {
 	}
 }
 
+func (jwtAuth *JWTAuth) isBlacklisted(token string) bool {
+	redisConn := redis.Connect()
+
+	if redisToken, _ := redisConn.GetValue(token); redisToken == nil {
+		return false
+	}
+
+	return true
+}
+
 func (jwtAuth *JWTAuth) RequireTokenAuthentication(rw http.ResponseWriter, rq *http.Request, next http.HandlerFunc) {
 	var tokenString string = rq.Header.Get("Authorization")
 
@@ -96,11 +110,11 @@ func (jwtAuth *JWTAuth) RequireTokenAuthentication(rw http.ResponseWriter, rq *h
 		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
 			return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
 		}
-		return jwtAuth.privateKey, nil
+		return jwtAuth.publicKey, nil
 	})
 
 	if err == nil {
-		if token.Valid {
+		if token.Valid && !jwtAuth.isBlacklisted(tokenString) {
 			next(rw, rq)
 		} else {
 			rw.WriteHeader(http.StatusUnauthorized)
@@ -108,10 +122,37 @@ func (jwtAuth *JWTAuth) RequireTokenAuthentication(rw http.ResponseWriter, rq *h
 		}
 	} else {
 		rw.WriteHeader(http.StatusUnauthorized)
-		fmt.Fprint(rw, "Unauthorized access to resource"+err.Error())
+		fmt.Fprint(rw, "Unauthorized access to resource "+err.Error())
 	}
 }
 
-func (jwtAuth *JWTAuth) PublicKey() *rsa.PublicKey {
-	return jwtAuth.publicKey
+func (jwtAuth *JWTAuth) getTokenRemainingValidity(timestamp interface{}) int {
+	if validity, ok := timestamp.(float64); ok {
+		tm := time.Unix(int64(validity), 0)
+		remainder := tm.Sub(time.Now())
+
+		if remainder > 0 {
+			return int(remainder.Seconds() + EXPIRE_OFFSET)
+		}
+	}
+
+	return EXPIRE_OFFSET
+}
+
+func (jwtAuth *JWTAuth) InvalidateToken(tokenString string, tokenHelper interface{}) error {
+	req := tokenHelper.(*http.Request)
+
+	tokenRequest, err := request.ParseFromRequest(req, request.OAuth2Extractor, func(token *jwt.Token) (interface{}, error) {
+		return jwtAuth.publicKey, nil
+	})
+
+	if err != nil {
+		return err
+	}
+
+	redisConn := redis.Connect()
+
+	claims := tokenRequest.Claims.(jwt.MapClaims)
+
+	return redisConn.SetValue(tokenString, tokenString, jwtAuth.getTokenRemainingValidity(claims["exp"]))
 }

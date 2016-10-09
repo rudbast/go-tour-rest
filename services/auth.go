@@ -2,11 +2,8 @@ package services
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 
-	// jwt "github.com/dgrijalva/jwt-go"
-	// request "github.com/dgrijalva/jwt-go/request"
 	"github.com/rudbast/go-tour-rest/api/parameters"
 	"github.com/rudbast/go-tour-rest/core/auth"
 	"github.com/rudbast/go-tour-rest/models"
@@ -43,17 +40,10 @@ func RefreshToken(user *models.User) []byte {
 	return response
 }
 
-// func Logout(req *http.Request) error {
-// 	authBackend := auth.GetAuthBackend()
+func Logout(req *http.Request) error {
+	authBackend := auth.GetAuthBackend()
 
-// 	tokenRequest, err := request.ParseFromRequest(req, request.OAuth2Extractor, func(token *jwt.Token) (interface{}, error) {
-// 		return authBackend.PublicKey(), nil
-// 	})
+	tokenString := req.Header.Get("Authorization")
 
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	tokenString := req.Header.Get("Authorization")
-// 	return authBackend.Logout
-// }
+	return authBackend.InvalidateToken(tokenString, req)
+}

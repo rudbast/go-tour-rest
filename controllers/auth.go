@@ -28,12 +28,13 @@ func RefreshToken(rw http.ResponseWriter, rq *http.Request, next http.HandlerFun
 	rw.Write(services.RefreshToken(&user))
 }
 
-// // Logout from system.
-// func Logout(rw http.ResponseWriter, rq *http.Request, next http.HandlerFunc) {
-// 	rw.Header().Set("Content-Type", "application/json")
-// 	if err := services.Logout(rq); err != nil {
-// 		rw.WriteHeader(http.StatusInternalServerError)
-// 	} else {
-// 		rw.WriteHeader(http.StatusOK)
-// 	}
-// }
+// Logout from system.
+func Logout(rw http.ResponseWriter, rq *http.Request, next http.HandlerFunc) {
+	rw.Header().Set("Content-Type", "application/json")
+
+	if err := services.Logout(rq); err != nil {
+		rw.WriteHeader(http.StatusInternalServerError)
+	} else {
+		rw.WriteHeader(http.StatusOK)
+	}
+}

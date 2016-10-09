@@ -12,6 +12,8 @@ type Auth interface {
 	GenerateToken(userId int) (string, error)
 	// Initialize backend.
 	InitBackend() error
+	// Invalidate token.
+	InvalidateToken(tokenString string, tokenHelper interface{}) error
 	// Middleware function for routes that needed authentication.
 	RequireTokenAuthentication(rw http.ResponseWriter, rq *http.Request, next http.HandlerFunc)
 }

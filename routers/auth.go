@@ -8,7 +8,7 @@ import (
 )
 
 // Set authentication related routes.
-func SetAuthenticationRoutes(router *mux.Router) *mux.Router {
+func SetAuthenticationRoutes(router *mux.Router) {
 	authBackend := auth.GetAuthBackend()
 
 	router.HandleFunc("/login", controllers.Login).Methods("POST")
@@ -19,10 +19,9 @@ func SetAuthenticationRoutes(router *mux.Router) *mux.Router {
 			negroni.HandlerFunc(controllers.RefreshToken),
 		)).Methods("GET")
 
-	// router.Handle("/logout",
-	// 	negroni.New(
-	// 		negroni.HandlerFunc(authentication.RequireTokenAuthentication),
-	// 		negroni.HandlerFunc(controllers.Logout),
-	// 	)).Methods("GET")
-	return router
+	router.Handle("/logout",
+		negroni.New(
+			negroni.HandlerFunc(authBackend.RequireTokenAuthentication),
+			negroni.HandlerFunc(controllers.Logout),
+		)).Methods("GET")
 }
